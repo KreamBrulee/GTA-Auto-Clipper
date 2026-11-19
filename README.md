@@ -28,6 +28,21 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+For a reproducible install with the exact versions this was tested against, use the lockfile instead: `pip install -r requirements.lock.txt`.
+
+### Quick start (easiest path)
+
+If you just want to get going, use the dashboard — it drives everything from a browser:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item .env.example .env          # then paste your keys into .env
+.venv\Scripts\python.exe dashboard.py
+```
+
+Open `http://127.0.0.1:8787`, go to the **Capture** tab, paste a live URL (or a local file for a test), and start. Clips appear in the gallery as they render; open one to review, caption, approve, and publish. The command-line tools below are the same steps without the browser.
+
 ### API keys
 
 Keys live in a local `.env` file that is gitignored, so they never get committed. Copy the template and fill in what you need:
@@ -90,21 +105,26 @@ A local control panel for reviewing clips and running captures from a browser. I
 Then open `http://127.0.0.1:8787`. It is bound to localhost only. From the dashboard you can:
 
 - See stats (clips total, approved, pending, published, average score) and a gallery of every clip in `output/` and `test_out/`, each playable in the browser.
-- Open a clip to review its score, transcript, language, and live-chat stats, edit the title / YouTube description / Instagram caption / hashtags / schedule, and toggle **Approved** — all written straight back to the clip's `.json`.
-- Start and stop `clip.py` captures (live URL or local test file) and watch the run log live.
+- Open a clip to review its score, transcript, language, and live-chat stats, edit the title / YouTube description / Instagram caption / hashtags / source link / schedule, and toggle **Approved** — all written straight back to the clip's `.json`.
+- Insert a trending caption with one click from the preset chips above the Instagram caption field.
+- Start and stop `clip.py` captures (live URL or local test file) and watch the run log live, with a banner while a capture is running.
 - Run `find_streams.py` discovery (needs `YOUTUBE_API_KEY` in the dashboard's environment).
+- **Clean up < 3**: delete unapproved, unpublished clips scoring below 3 (approved and published clips are always kept; it previews the list and asks before deleting).
+- **Publish** an approved clip to your connected accounts: a dry-run button (sends nothing) and a publish button, both calling `zernio_publish.py` under the hood. The source link you set is appended to the descriptions automatically.
 
-Publishing still happens only through `zernio_publish.py`; the dashboard shows the exact dry-run command for an approved clip.
+For Instagram-only setups, a clip only needs an Instagram caption and **Approved** to publish — a YouTube title and description are required only when a YouTube account is configured.
 
 ## Schedule to YouTube + Instagram
 
-Connect your YouTube account and an Instagram Creator or Business account to Zernio. Set the key and account IDs as private environment variables:
+Connect a YouTube account and/or an Instagram Creator or Business account to Zernio. Put the key and account IDs in your `.env` (see `.env.example`). **Set only the accounts you actually use** — the clip is posted only to the platforms whose account ID is present, so an Instagram-only setup just leaves the YouTube ID blank:
 
-```powershell
-$env:ZERNIO_API_KEY = "YOUR_ZERNIO_API_KEY"
-$env:ZERNIO_YOUTUBE_ACCOUNT_ID = "YOUR_YOUTUBE_ACCOUNT_ID"
-$env:ZERNIO_INSTAGRAM_ACCOUNT_ID = "YOUR_INSTAGRAM_ACCOUNT_ID"
 ```
+ZERNIO_API_KEY=YOUR_ZERNIO_API_KEY
+ZERNIO_INSTAGRAM_ACCOUNT_ID=YOUR_INSTAGRAM_ACCOUNT_ID
+# ZERNIO_YOUTUBE_ACCOUNT_ID=          # leave blank for Instagram-only
+```
+
+A clip needs an Instagram caption to post to Instagram, and a title plus YouTube description to post to YouTube; fields for a platform you have not configured are not required.
 
 Review the clip and its JSON metadata, then mark the metadata `"approved": true`. Preview the schedule first:
 

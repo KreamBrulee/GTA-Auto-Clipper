@@ -12,6 +12,44 @@ const api = {
 let CLIPS = [];
 let current = null; // clip in the drawer
 
+// Trending Instagram caption presets (click to insert). Edit this list to swap in new ones.
+// Each entry: {label} shown on the chip, {text} inserted into the caption.
+const IG_PRESETS = [
+  {
+    label: "Japan footsteps (full)",
+    text: "🇯🇵 Japan is turning footsteps into electricity! Using piezoelectric tiles, every step generates a small amount of energy. Millions of footsteps together can power LED lights and displays in busy places like Shibuya Station. A small step for one person, a big step for clean energy. 👟⚡🔋🌱",
+  },
+  {
+    label: "Japan footsteps (short)",
+    text: "Japan is turning footsteps into electricity. Every step counts—literally. 🇯🇵⚡",
+  },
+  {
+    label: "Japan footsteps (funny)",
+    text: "Phone battery at 1%? People in Japan simply start walking faster. 👟🔋",
+  },
+];
+
+// Build the clickable preset chips once.
+(function renderPresets() {
+  const wrap = $("igPresets");
+  if (!wrap) return;
+  IG_PRESETS.forEach((preset) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "preset-chip";
+    chip.textContent = preset.label;
+    chip.title = preset.text;   // full text on hover
+    chip.addEventListener("click", () => {
+      const ta = $("edIg");
+      const cur = ta.value.trim();
+      ta.value = cur ? cur + "\n" + preset.text : preset.text;
+      ta.dispatchEvent(new Event("input"));
+      ta.focus();
+    });
+    wrap.appendChild(chip);
+  });
+})();
+
 // ---------- tabs ----------
 document.querySelectorAll(".tab").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -83,6 +121,18 @@ $("refreshClips").addEventListener("click", loadClips);
 $("hideTest").addEventListener("change", renderClips);
 $("sortBy").addEventListener("change", renderClips);
 
+$("cleanupBtn").addEventListener("click", async () => {
+  // Preview first (dry run), so the user sees exactly what will be deleted.
+  const preview = await api.post("/api/clips/cleanup", { threshold: 3, dry_run: true });
+  const names = (preview.data.removed) || [];
+  if (!names.length) { alert("No clips below 3 to remove (approved/published clips are always kept)."); return; }
+  if (!confirm(`Delete ${names.length} clip(s) scoring below 3?\n\n` + names.join("\n") +
+               `\n\nApproved and published clips are kept. This cannot be undone.`)) return;
+  const res = await api.post("/api/clips/cleanup", { threshold: 3, dry_run: false });
+  await loadClips();
+  alert(`Removed ${(res.data.removed || []).length} clip(s). ${res.data.kept} kept.`);
+});
+
 // ---------- drawer / editor ----------
 function chip(label, val) {
   if (val === null || val === undefined || val === "") return "";
@@ -109,6 +159,7 @@ function openDrawer(folder, name) {
   $("edYt").value = c.youtube_description || "";
   $("edIg").value = c.instagram_caption || "";
   $("edTags").value = (c.hashtags || []).join(", ");
+  $("edSource").value = c.source_link || c.source_url || "";
   $("edPostAt").value = c.post_at || "";
   $("edApproved").checked = !!c.approved;
   $("savedMsg").textContent = "";
@@ -130,9 +181,9 @@ function closeDrawer() {
 $("closeDrawer").addEventListener("click", closeDrawer);
 $("drawerBackdrop").addEventListener("click", closeDrawer);
 
+// Instagram-only publishing: a caption and approval are all that's required.
 function readyToPublish() {
-  return $("edTitle").value.trim() && $("edYt").value.trim()
-    && $("edIg").value.trim() && $("edApproved").checked
+  return $("edIg").value.trim() && $("edApproved").checked
     && current && !current.test && current.folder === "output";
 }
 function updatePublishNote() {
@@ -140,8 +191,6 @@ function updatePublishNote() {
   const box = $("publishBox");
   if (!current) return;
   const missing = [];
-  if (!$("edTitle").value.trim()) missing.push("title");
-  if (!$("edYt").value.trim()) missing.push("YouTube description");
   if (!$("edIg").value.trim()) missing.push("Instagram caption");
   if (!$("edApproved").checked) missing.push("approval");
   if (current.test || current.folder !== "output") {
@@ -209,6 +258,7 @@ $("saveClip").addEventListener("click", async () => {
     youtube_description: $("edYt").value.trim(),
     instagram_caption: $("edIg").value.trim(),
     hashtags: $("edTags").value,
+    source_link: $("edSource").value.trim(),
     post_at: $("edPostAt").value.trim(),
     approved: $("edApproved").checked,
   };

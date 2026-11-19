@@ -39,7 +39,7 @@ STATIC = HERE / "dashboard_ui"
 PY = sys.executable  # the venv's python, since the dashboard is launched with it
 
 # Fields in a clip's JSON that the operator may edit from the UI.
-EDITABLE = ("title", "youtube_description", "instagram_caption", "hashtags", "post_at", "approved")
+EDITABLE = ("title", "youtube_description", "instagram_caption", "hashtags", "post_at", "approved", "source_link")
 
 
 # ---------------------------------------------------------------- run manager
@@ -171,6 +171,8 @@ def list_clips():
                 "instagram_caption": meta.get("instagram_caption") or "",
                 "hashtags": meta.get("hashtags") or [],
                 "post_at": meta.get("post_at") or "",
+                "source_url": meta.get("source_url") or "",
+                "source_link": meta.get("source_link") or meta.get("source_url") or "",
             })
     return clips
 
@@ -220,6 +222,30 @@ def update_clip(folder, name, patch):
     with meta_path.open("w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
     return meta, "ok"
+
+
+def cleanup_low_scores(threshold=3.0, dry_run=False):
+    """Delete output clips (mp4 + json) scoring below `threshold`.
+
+    Approved and already-published clips are always kept, as a safety net.
+    Returns (removed_names, kept_count). dry_run just lists what would go.
+    """
+    removed = []
+    kept = 0
+    for meta_path in sorted(OUTPUT_DIR.glob("*.json")):
+        meta = _read_json(meta_path)
+        if meta is None:
+            continue
+        score = meta.get("score")
+        protected = bool(meta.get("approved")) or bool(meta.get("zernio_post_id")) or bool(meta.get("posted"))
+        if isinstance(score, (int, float)) and score < threshold and not protected:
+            if not dry_run:
+                meta_path.unlink(missing_ok=True)
+                meta_path.with_suffix(".mp4").unlink(missing_ok=True)
+            removed.append(meta_path.stem)
+        else:
+            kept += 1
+    return removed, kept
 
 
 # ---------------------------------------------------------------- command builders
@@ -399,6 +425,15 @@ class Handler(BaseHTTPRequestHandler):
                 (body.get("scheduled_for") or "").strip(),
                 bool(body.get("publish")), bool(body.get("now")))
             self._send_json({"ok": ok, "output": output, "configured": configured})
+            return
+        if route == "/api/clips/cleanup":
+            try:
+                threshold = float(body.get("threshold", 3.0))
+            except (TypeError, ValueError):
+                threshold = 3.0
+            removed, kept = cleanup_low_scores(threshold, dry_run=bool(body.get("dry_run")))
+            self._send_json({"ok": True, "removed": removed, "kept": kept,
+                             "threshold": threshold, "dry_run": bool(body.get("dry_run"))})
             return
         if route == "/api/capture/start":
             cmd, err = build_capture_cmd(body)

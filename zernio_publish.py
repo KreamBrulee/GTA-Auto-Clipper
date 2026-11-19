@@ -23,13 +23,27 @@ PLATFORMS = (
 )
 
 
-def load_metadata(path):
+def load_metadata(path, platforms=("youtube", "instagram")):
+    """Validate a clip's metadata for the platforms it will actually be posted to.
+
+    Instagram needs a caption. YouTube needs a title and description. Fields for a
+    platform that is not configured (no account ID) are not required, so an
+    Instagram-only setup can publish with just a caption.
+    """
     with path.open(encoding="utf-8") as file:
         metadata = json.load(file)
-    if not metadata.get("title") or not metadata.get("youtube_description") or not metadata.get("instagram_caption"):
-        raise ValueError("metadata needs a title, YouTube description, and Instagram caption")
     if metadata.get("test"):
         raise ValueError("test clips cannot be published")
+    missing = []
+    if "instagram" in platforms and not metadata.get("instagram_caption"):
+        missing.append("Instagram caption")
+    if "youtube" in platforms:
+        if not metadata.get("title"):
+            missing.append("title")
+        if not metadata.get("youtube_description"):
+            missing.append("YouTube description")
+    if missing:
+        raise ValueError("metadata needs " + ", ".join(missing))
     return metadata
 
 
@@ -40,12 +54,22 @@ def scheduled_local_time(value):
     return when.astimezone(IST).replace(tzinfo=None).isoformat(timespec="seconds")
 
 
+def with_source_link(text, metadata):
+    """Append the livestream/source link on its own line, unless it is already present."""
+    link = (metadata.get("source_link") or metadata.get("source_url") or "").strip()
+    if not link or link in (text or ""):
+        return text
+    return f"{(text or '').rstrip()}\n\nSource: {link}"
+
+
 def post_body(metadata, public_url, accounts, schedule):
+    youtube_description = with_source_link(metadata.get("youtube_description", ""), metadata)
+    instagram_caption = with_source_link(metadata.get("instagram_caption", ""), metadata)
     platforms = []
     for platform, account_id in accounts:
         entry = {"platform": platform, "accountId": account_id}
         if platform == "youtube":
-            entry["customContent"] = metadata["youtube_description"]
+            entry["customContent"] = youtube_description
             entry["platformSpecificData"] = {
                 "title": metadata["title"][:100],
                 "visibility": "public",
@@ -53,10 +77,10 @@ def post_body(metadata, public_url, accounts, schedule):
                 "madeForKids": False,
             }
         else:
-            entry["customContent"] = metadata["instagram_caption"]
+            entry["customContent"] = instagram_caption
         platforms.append(entry)
     body = {
-        "content": metadata["instagram_caption"],
+        "content": instagram_caption,
         "mediaItems": [{"url": public_url, "type": "video"}],
         "platforms": platforms,
         "timezone": "Asia/Kolkata",
@@ -119,8 +143,13 @@ def main():
     video_path, metadata_path = base.with_suffix(".mp4"), base.with_suffix(".json")
     if not video_path.is_file() or not metadata_path.is_file():
         sys.exit("Clip files not found. Expected matching .mp4 and .json files.")
+    accounts = [(platform, os.environ.get(variable, "")) for platform, variable in PLATFORMS]
+    accounts = [(platform, account) for platform, account in accounts if account]
+    # Validate only the fields the configured platforms need. If no account is set
+    # (e.g. a dry run before setup), fall back to requiring both platforms' fields.
+    active_platforms = tuple(p for p, _ in accounts) or ("youtube", "instagram")
     try:
-        metadata = load_metadata(metadata_path)
+        metadata = load_metadata(metadata_path, active_platforms)
         schedule = "now" if args.now else (scheduled_local_time(args.scheduled_for) if args.scheduled_for else None)
     except (OSError, ValueError, json.JSONDecodeError) as error:
         sys.exit(str(error))
@@ -136,8 +165,6 @@ def main():
         sys.exit("Clip metadata is not approved. Review it, or configure unattended posting and pass --unattended.")
     if args.unattended and os.environ.get("GTA_UNATTENDED_POSTS") != "1":
         sys.exit("Set GTA_UNATTENDED_POSTS=1 in your private environment to enable unattended publishing.")
-    accounts = [(platform, os.environ.get(variable, "")) for platform, variable in PLATFORMS]
-    accounts = [(platform, account) for platform, account in accounts if account]
     if args.publish and not accounts:
         sys.exit("Set ZERNIO_YOUTUBE_ACCOUNT_ID and/or ZERNIO_INSTAGRAM_ACCOUNT_ID in your environment.")
     api_key = os.environ.get("ZERNIO_API_KEY")

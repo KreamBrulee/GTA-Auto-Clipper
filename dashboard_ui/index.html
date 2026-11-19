@@ -44,6 +44,7 @@
             <option value="score">Highest score</option>
           </select>
           <button class="ghost" id="refreshClips">Refresh</button>
+          <button class="danger" id="cleanupBtn" title="Delete unapproved output clips scoring below 3">Clean up &lt; 3</button>
         </div>
       </div>
       <div class="clip-grid" id="clipGrid"></div>
@@ -128,8 +129,17 @@
     <div class="meta-chips" id="drawerChips"></div>
     <div class="field"><label>Title (YouTube, ≤100 chars)</label><input type="text" id="edTitle" maxlength="120" /></div>
     <div class="field"><label>YouTube description</label><textarea id="edYt" rows="3"></textarea></div>
-    <div class="field"><label>Instagram caption</label><textarea id="edIg" rows="3"></textarea></div>
+    <div class="field">
+      <label>Instagram caption</label>
+      <div class="presets" id="igPresets"><span class="presets-label">trending:</span></div>
+      <textarea id="edIg" rows="3"></textarea>
+    </div>
     <div class="field"><label>Hashtags (comma or space separated)</label><input type="text" id="edTags" /></div>
+    <div class="field">
+      <label>Source link (livestream)</label>
+      <input type="text" id="edSource" placeholder="https://www.youtube.com/watch?v=..." />
+      <small>Appended as a "Source:" line to both the YouTube description and Instagram caption at publish time.</small>
+    </div>
     <div class="field"><label>Post at (ISO, e.g. 2026-11-20T12:00:00+05:30)</label><input type="text" id="edPostAt" /></div>
     <label class="approve"><input type="checkbox" id="edApproved" /> <b>Approved</b> — ready to schedule</label>
     <p class="publish-note" id="publishNote"></p>
