@@ -112,6 +112,11 @@ function openDrawer(folder, name) {
   $("edPostAt").value = c.post_at || "";
   $("edApproved").checked = !!c.approved;
   $("savedMsg").textContent = "";
+  $("pubSched").value = c.post_at || "";
+  $("pubNow").checked = false;
+  $("schedRow").style.opacity = "1";
+  const out = $("publishOut"); out.hidden = true; out.textContent = "";
+  $("publishConfigNote").textContent = "";
   updatePublishNote();
   $("drawer").hidden = false;
   $("drawerBackdrop").hidden = false;
@@ -125,33 +130,77 @@ function closeDrawer() {
 $("closeDrawer").addEventListener("click", closeDrawer);
 $("drawerBackdrop").addEventListener("click", closeDrawer);
 
+function readyToPublish() {
+  return $("edTitle").value.trim() && $("edYt").value.trim()
+    && $("edIg").value.trim() && $("edApproved").checked
+    && current && !current.test && current.folder === "output";
+}
 function updatePublishNote() {
   const note = $("publishNote");
-  const cmd = $("publishCmd");
+  const box = $("publishBox");
   if (!current) return;
   const missing = [];
   if (!$("edTitle").value.trim()) missing.push("title");
   if (!$("edYt").value.trim()) missing.push("YouTube description");
   if (!$("edIg").value.trim()) missing.push("Instagram caption");
   if (!$("edApproved").checked) missing.push("approval");
-  if (current.test) {
+  if (current.test || current.folder !== "output") {
     note.className = "publish-note";
     note.textContent = "Test clips cannot be published.";
-    cmd.textContent = "";
+    box.style.display = "none";
     return;
   }
-  if (missing.length) {
+  box.style.display = "block";
+  if (current.published) {
+    note.className = "publish-note ok";
+    note.textContent = "Already sent to Zernio (post " + (current.zernio_post_id || "?") + ").";
+  } else if (missing.length) {
     note.className = "publish-note";
-    note.textContent = "Needs " + missing.join(", ") + " before it can be scheduled.";
-    cmd.textContent = "";
+    note.textContent = "Needs " + missing.join(", ") + " before it can be published. Save first.";
   } else {
     note.className = "publish-note ok";
-    note.textContent = "Ready to schedule. Preview (dry-run) with:";
-    cmd.textContent = `.venv\\Scripts\\python.exe zernio_publish.py "output\\${current.name}" --scheduled-for "${current.post_at || "2026-11-20T12:00:00+05:30"}"`;
+    note.textContent = "Ready. Save, then dry-run or publish below.";
   }
+  const ready = readyToPublish();
+  $("dryRunBtn").disabled = !ready;
+  $("publishBtn").disabled = !ready || current.published;
+  // keep the schedule field synced with the saved post_at
+  if (!$("pubSched").value && current.post_at) $("pubSched").value = current.post_at;
 }
 ["edTitle", "edYt", "edIg", "edApproved", "edPostAt"].forEach((id) =>
   $(id).addEventListener("input", updatePublishNote));
+$("pubNow").addEventListener("change", () => {
+  $("schedRow").style.opacity = $("pubNow").checked ? ".4" : "1";
+});
+
+async function doPublish(reallyPublish) {
+  if (!current) return;
+  const out = $("publishOut");
+  const now = $("pubNow").checked;
+  const sched = $("pubSched").value.trim();
+  if (reallyPublish && !now && !sched) { alert("Set a schedule time or tick 'publish now'."); return; }
+  if (reallyPublish) {
+    const when = now ? "right now" : ("at " + sched);
+    if (!confirm(`This will upload "${current.name}" to Zernio and schedule a REAL Instagram post ${when}. Continue?`)) return;
+  }
+  out.hidden = false;
+  out.textContent = reallyPublish ? "Publishing…" : "Running dry run…";
+  $("dryRunBtn").disabled = true; $("publishBtn").disabled = true;
+  const { data } = await api.post("/api/clip/publish", {
+    folder: current.folder, name: current.name,
+    scheduled_for: sched, now, publish: reallyPublish,
+  });
+  out.textContent = data.output || (data.ok ? "done" : "failed");
+  if (!data.configured) {
+    $("publishConfigNote").textContent = "Zernio keys are not fully set in the dashboard's environment; real publishing is disabled.";
+  }
+  await loadClips();
+  const fresh = CLIPS.find((x) => x.folder === current.folder && x.name === current.name);
+  if (fresh) current = fresh;
+  updatePublishNote();
+}
+$("dryRunBtn").addEventListener("click", () => doPublish(false));
+$("publishBtn").addEventListener("click", () => doPublish(true));
 
 $("saveClip").addEventListener("click", async () => {
   if (!current) return;
@@ -224,25 +273,39 @@ $("stopRun").addEventListener("click", () => api.post("/api/run/stop"));
 $("stopRun2").addEventListener("click", () => api.post("/api/run/stop"));
 
 let lastRunning = false;
+let pollTicks = 0;
 async function pollRun() {
   let st;
   try { st = await api.get("/api/run"); } catch { return; }
-  const dot = $("runDot"), label = $("runLabel");
+  const dot = $("runDot"), label = $("runLabel"), banner = $("captureBanner");
   if (st.running) {
     dot.classList.add("live");
-    label.textContent = `${st.kind} · ${st.elapsed ?? 0}s`;
+    label.textContent = `${st.kind} · ${Math.round(st.elapsed ?? 0)}s`;
+    if (st.kind === "capture") {
+      banner.hidden = false;
+      banner.innerHTML = `<span class="dot live"></span> Capture running · ${Math.round(st.elapsed ?? 0)}s elapsed ` +
+        `<button class="danger small" id="bannerStop">Stop</button>`;
+      const bs = document.getElementById("bannerStop");
+      if (bs) bs.onclick = () => api.post("/api/run/stop");
+    } else {
+      banner.hidden = true;
+    }
   } else {
     dot.classList.remove("live");
     label.textContent = st.returncode == null ? "idle" : `idle (last exit ${st.returncode})`;
+    banner.hidden = true;
   }
   $("runMeta").textContent = st.cmd ? st.cmd.join(" ") : "";
   const box = $("logBox");
   const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
   box.textContent = (st.log && st.log.length) ? st.log.join("\n") : "No run yet.";
   if (atBottom) box.scrollTop = box.scrollHeight;
-  // when a run finishes, refresh the clip list once
+  // While a capture runs, clips keep arriving in output/ — refresh the gallery
+  // periodically (every ~6s) so they show up live; and once more when it ends.
+  if (st.running && st.kind === "capture" && pollTicks % 4 === 0) loadClips();
   if (lastRunning && !st.running) loadClips();
   lastRunning = st.running;
+  pollTicks++;
 }
 
 previewCmd();

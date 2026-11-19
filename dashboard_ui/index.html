@@ -23,6 +23,8 @@
 
   <section class="stats" id="stats"><!-- stat tiles injected --></section>
 
+  <div class="capture-banner" id="captureBanner" hidden></div>
+
   <nav class="tabs">
     <button class="tab active" data-tab="clips">Clips</button>
     <button class="tab" data-tab="capture">Capture</button>
@@ -135,7 +137,21 @@
       <button class="primary" id="saveClip">Save</button>
       <span class="saved" id="savedMsg"></span>
     </div>
-    <div class="publish-cmd" id="publishCmd"></div>
+
+    <div class="publish-box" id="publishBox">
+      <h4>Publish</h4>
+      <label class="now-row"><input type="checkbox" id="pubNow" /> publish now (ignore the time below)</label>
+      <div class="field" id="schedRow">
+        <label>Schedule time (ISO + offset)</label>
+        <input type="text" id="pubSched" placeholder="2026-11-20T18:00:00+05:30" />
+      </div>
+      <div class="actions">
+        <button class="ghost" id="dryRunBtn">Dry run (preview)</button>
+        <button class="primary" id="publishBtn">Publish to Instagram</button>
+      </div>
+      <pre class="publish-out" id="publishOut" hidden></pre>
+      <p class="hint" id="publishConfigNote"></p>
+    </div>
   </aside>
 
   <script src="/app.js"></script>

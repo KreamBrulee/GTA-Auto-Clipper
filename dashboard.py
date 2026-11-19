@@ -264,6 +264,35 @@ def build_capture_cmd(opts):
     return cmd, None
 
 
+def run_publish(folder, name, scheduled_for, do_publish, now):
+    """Run zernio_publish.py for one clip. Returns (ok, output_text, publishing_configured).
+
+    do_publish=False is a dry run (sends nothing). now=True publishes immediately
+    instead of using scheduled_for. This is synchronous so the UI gets the result.
+    """
+    if folder != "output":
+        return False, "Only clips in output/ can be published (test clips cannot).", True
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", name or ""):
+        return False, "bad clip name", True
+    cmd = [PY, "zernio_publish.py", str((OUTPUT_DIR / name))]
+    if now:
+        cmd.append("--now")
+    elif scheduled_for:
+        cmd += ["--scheduled-for", scheduled_for]
+    if do_publish:
+        cmd.append("--publish")
+    try:
+        result = subprocess.run(cmd, cwd=str(HERE), capture_output=True, text=True,
+                                encoding="utf-8", errors="replace", timeout=1800)
+    except subprocess.TimeoutExpired:
+        return False, "Publish timed out after 30 minutes.", True
+    out = (result.stdout or "") + (result.stderr or "")
+    # Whether real publishing is even possible depends on the Zernio env vars.
+    configured = bool(os.environ.get("ZERNIO_API_KEY")) and bool(
+        os.environ.get("ZERNIO_INSTAGRAM_ACCOUNT_ID") or os.environ.get("ZERNIO_YOUTUBE_ACCOUNT_ID"))
+    return result.returncode == 0, out.strip(), configured
+
+
 # ---------------------------------------------------------------- HTTP handler
 class Handler(BaseHTTPRequestHandler):
     server_version = "GTAClipperDashboard/1.0"
@@ -363,6 +392,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": msg}, 400)
             else:
                 self._send_json({"ok": True})
+            return
+        if route == "/api/clip/publish":
+            ok, output, configured = run_publish(
+                body.get("folder"), body.get("name"),
+                (body.get("scheduled_for") or "").strip(),
+                bool(body.get("publish")), bool(body.get("now")))
+            self._send_json({"ok": ok, "output": output, "configured": configured})
             return
         if route == "/api/capture/start":
             cmd, err = build_capture_cmd(body)
