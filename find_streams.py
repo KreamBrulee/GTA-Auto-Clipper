@@ -12,6 +12,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import env_loader; env_loader.load()
+
 API = "https://www.googleapis.com/youtube/v3/search"
 
 

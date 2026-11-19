@@ -28,10 +28,18 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-For live-stream search and optional YouTube live-chat scoring, set a YouTube Data API key in the terminal. Keep keys out of prompts, source files, and GitHub:
+### API keys
+
+Keys live in a local `.env` file that is gitignored, so they never get committed. Copy the template and fill in what you need:
 
 ```powershell
-$env:YOUTUBE_API_KEY = "YOUR_YOUTUBE_DATA_API_KEY"
+Copy-Item .env.example .env
+# then edit .env and paste your keys
+```
+
+Every script loads `.env` automatically on startup. A variable you also set in the terminal (`$env:YOUTUBE_API_KEY = "..."`) still overrides the `.env` value. Only `YOUTUBE_API_KEY` is needed for stream search and YouTube live-chat scoring; the `ZERNIO_*` keys are only for publishing. Keep keys out of prompts, source files, and GitHub.
+
+```powershell
 python find_streams.py "GTA 6" --max 25 --json
 ```
 
@@ -70,6 +78,23 @@ Test a local video first. Test output goes to `test_out/` and cannot be publishe
 ```powershell
 python clip.py --file "C:\videos\gameplay.mp4" --test --clip-len 30
 ```
+
+## Operator dashboard
+
+A local control panel for reviewing clips and running captures from a browser. It uses only the Python standard library (no extra install) and never posts anything.
+
+```powershell
+.venv\Scripts\python.exe dashboard.py
+```
+
+Then open `http://127.0.0.1:8787`. It is bound to localhost only. From the dashboard you can:
+
+- See stats (clips total, approved, pending, published, average score) and a gallery of every clip in `output/` and `test_out/`, each playable in the browser.
+- Open a clip to review its score, transcript, language, and live-chat stats, edit the title / YouTube description / Instagram caption / hashtags / schedule, and toggle **Approved** — all written straight back to the clip's `.json`.
+- Start and stop `clip.py` captures (live URL or local test file) and watch the run log live.
+- Run `find_streams.py` discovery (needs `YOUTUBE_API_KEY` in the dashboard's environment).
+
+Publishing still happens only through `zernio_publish.py`; the dashboard shows the exact dry-run command for an approved clip.
 
 ## Schedule to YouTube + Instagram
 

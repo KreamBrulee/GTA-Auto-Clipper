@@ -1,0 +1,42 @@
+# Fully-pinned lockfile for a reproducible venv.
+# Generated from a working install on Python 3.14.3 (Windows).
+# Rebuild an identical environment with:
+#   python -m venv .venv
+#   .venv\Scripts\python.exe -m pip install -r requirements.lock.txt
+#
+# requirements.txt stays the loose, top-level list; this file pins the full
+# resolved tree (direct deps + transitive). Regenerate with `pip freeze`.
+
+# --- direct dependencies (from requirements.txt) ---
+numpy==2.5.5
+faster-whisper==1.2.1
+yt-dlp==2026.10.26
+requests==2.34.2
+opencv-python-headless==5.1.0.95
+
+# --- transitive dependencies ---
+anyio==4.16.0
+av==19.0.2
+certifi==2026.10.23
+charset-normalizer==3.5.2
+click==8.5.1
+colorama==0.4.6
+ctranslate2==4.9.0
+filelock==4.2.12
+flatbuffers==25.12.19
+fsspec==2026.9.0
+h11==0.16.0
+hf-xet==1.8.0
+httpcore2==2.16.2
+httpx2==2.16.2
+huggingface_hub==2.4.0
+idna==3.20
+onnxruntime==1.32.0
+packaging==26.3
+protobuf==7.36.2
+PyYAML==6.0.3
+tokenizers==0.23.3
+tqdm==4.70.1
+truststore==0.10.5
+typing_extensions==4.16.0
+urllib3==2.8.0

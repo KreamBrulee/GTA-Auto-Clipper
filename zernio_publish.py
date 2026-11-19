@@ -13,6 +13,8 @@ from pathlib import Path
 
 import requests
 
+import env_loader; env_loader.load()
+
 API = "https://zernio.com/api/v1"
 IST = dt.timezone(dt.timedelta(hours=5, minutes=30))
 PLATFORMS = (

@@ -1,3 +1,5 @@
+.venv/
+venv/
 .env
 .dev.vars
 .dev.vars.*

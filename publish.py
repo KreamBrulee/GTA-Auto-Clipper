@@ -5,6 +5,8 @@ Reads PUBLISH_API_KEY, PUBLISH_YOUTUBE_ACCOUNT_ID and PUBLISH_INSTAGRAM_ACCOUNT_
 """
 import os
 
+import env_loader; env_loader.load()
+
 for new, old in (("PUBLISH_API_KEY", "ZERNIO_API_KEY"), ("PUBLISH_YOUTUBE_ACCOUNT_ID", "ZERNIO_YOUTUBE_ACCOUNT_ID"),
                  ("PUBLISH_INSTAGRAM_ACCOUNT_ID", "ZERNIO_INSTAGRAM_ACCOUNT_ID")):
     if os.environ.get(new) and not os.environ.get(old):

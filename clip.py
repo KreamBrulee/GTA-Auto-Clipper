@@ -5,6 +5,7 @@ This command only records/renders. It never uploads or publishes.
 import argparse, glob, json, math, os, re, shutil, subprocess, sys, time
 from datetime import datetime
 import numpy as np
+import env_loader; env_loader.load()
 from live_chat import create_live_chat_collector, score_chat_windows, summarize_chat_window
 
 HERE = os.path.dirname(os.path.abspath(__file__))

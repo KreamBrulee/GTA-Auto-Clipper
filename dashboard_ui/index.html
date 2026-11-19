@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GTA Auto Clipper — Dashboard</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◆</span>
+      <div>
+        <h1>GTA Auto Clipper</h1>
+        <p class="sub">Local operator dashboard · nothing is ever posted from here</p>
+      </div>
+    </div>
+    <div class="run-indicator" id="runIndicator">
+      <span class="dot" id="runDot"></span>
+      <span id="runLabel">idle</span>
+    </div>
+  </header>
+
+  <section class="stats" id="stats"><!-- stat tiles injected --></section>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="clips">Clips</button>
+    <button class="tab" data-tab="capture">Capture</button>
+    <button class="tab" data-tab="discover">Discover</button>
+    <button class="tab" data-tab="log">Run log</button>
+  </nav>
+
+  <main>
+    <!-- CLIPS -->
+    <section class="panel active" id="tab-clips">
+      <div class="panel-head">
+        <h2>Rendered clips</h2>
+        <div class="filters">
+          <label><input type="checkbox" id="hideTest" /> hide test clips</label>
+          <select id="sortBy">
+            <option value="mtime">Newest first</option>
+            <option value="score">Highest score</option>
+          </select>
+          <button class="ghost" id="refreshClips">Refresh</button>
+        </div>
+      </div>
+      <div class="clip-grid" id="clipGrid"></div>
+      <p class="empty" id="clipsEmpty" hidden>No clips yet. Run a capture to produce some.</p>
+    </section>
+
+    <!-- CAPTURE -->
+    <section class="panel" id="tab-capture">
+      <div class="panel-head"><h2>Start a capture</h2></div>
+      <form id="captureForm" class="form">
+        <div class="field">
+          <label>Live YouTube URL</label>
+          <input type="text" id="capUrl" placeholder="https://www.youtube.com/watch?v=..." />
+          <small>Leave blank and set a file below to run a local test instead.</small>
+        </div>
+        <div class="field">
+          <label>…or local file (test only)</label>
+          <input type="text" id="capFile" placeholder="C:\videos\gameplay.mp4" />
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Clip length (s)</label><input type="number" id="capClipLen" value="30" min="1" /></div>
+          <div class="field"><label>Chunk (s)</label><input type="number" id="capChunk" value="90" min="1" /></div>
+          <div class="field"><label>Lead-in (s)</label><input type="number" id="capLeadIn" value="6" min="0" step="0.5" /></div>
+          <div class="field"><label>Top per chunk</label><input type="number" id="capTop" value="1" min="1" /></div>
+          <div class="field"><label>Min score</label><input type="number" id="capMinScore" value="2.5" step="0.1" /></div>
+          <div class="field"><label>Max seconds (0 = until stopped)</label><input type="number" id="capMaxSeconds" value="0" min="0" /></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Layout</label>
+            <select id="capLayout"><option value="fill">fill (full screen)</option><option value="fit">fit (blurred bg)</option></select>
+          </div>
+          <div class="field"><label>Moment source</label>
+            <select id="capMoment"><option value="chat">chat</option><option value="combined">combined</option><option value="audio">audio</option></select>
+          </div>
+          <div class="field"><label>Spoken language</label>
+            <select id="capLang"><option value="auto">auto</option><option value="en">en</option><option value="hi">hi</option></select>
+          </div>
+        </div>
+        <div class="checks">
+          <label><input type="checkbox" id="capConfirmed" /> <b>Gameplay confirmed</b> — I inspected the stream and saw real GTA gameplay (required for live capture)</label>
+          <label><input type="checkbox" id="capTest" /> test mode (render to test_out/, cannot be published)</label>
+          <label><input type="checkbox" id="capNoChat" /> no chat (audio/speech scoring only)</label>
+        </div>
+        <div class="cmd-preview" id="cmdPreview"></div>
+        <div class="actions">
+          <button type="submit" class="primary" id="startCapture">Start capture</button>
+          <button type="button" class="danger" id="stopRun">Stop current run</button>
+        </div>
+        <p class="hint">Live capture runs until you press <b>Stop</b> (unless you set max seconds). Watch progress in the <b>Run log</b> tab.</p>
+      </form>
+    </section>
+
+    <!-- DISCOVER -->
+    <section class="panel" id="tab-discover">
+      <div class="panel-head"><h2>Find live streams</h2></div>
+      <p class="hint">Needs <code>YOUTUBE_API_KEY</code> set in the environment where you launched the dashboard. Output appears in the Run log. Ranking is YouTube view-count order, not a live-viewer leaderboard — always open and confirm a stream before capturing.</p>
+      <form id="discoverForm" class="form inline">
+        <input type="text" id="discQuery" value="GTA 6" placeholder="search phrase" />
+        <input type="number" id="discMax" value="10" min="1" max="50" />
+        <button type="submit" class="primary">Search</button>
+      </form>
+    </section>
+
+    <!-- LOG -->
+    <section class="panel" id="tab-log">
+      <div class="panel-head">
+        <h2>Run log <span class="run-meta" id="runMeta"></span></h2>
+        <button class="danger" id="stopRun2">Stop run</button>
+      </div>
+      <pre class="log" id="logBox">No run yet.</pre>
+    </section>
+  </main>
+
+  <!-- editor drawer -->
+  <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+  <aside class="drawer" id="drawer" hidden>
+    <div class="drawer-head">
+      <h3 id="drawerName">clip</h3>
+      <button class="ghost" id="closeDrawer">✕</button>
+    </div>
+    <video id="drawerVideo" controls playsinline></video>
+    <div class="meta-chips" id="drawerChips"></div>
+    <div class="field"><label>Title (YouTube, ≤100 chars)</label><input type="text" id="edTitle" maxlength="120" /></div>
+    <div class="field"><label>YouTube description</label><textarea id="edYt" rows="3"></textarea></div>
+    <div class="field"><label>Instagram caption</label><textarea id="edIg" rows="3"></textarea></div>
+    <div class="field"><label>Hashtags (comma or space separated)</label><input type="text" id="edTags" /></div>
+    <div class="field"><label>Post at (ISO, e.g. 2026-11-20T12:00:00+05:30)</label><input type="text" id="edPostAt" /></div>
+    <label class="approve"><input type="checkbox" id="edApproved" /> <b>Approved</b> — ready to schedule</label>
+    <p class="publish-note" id="publishNote"></p>
+    <div class="actions">
+      <button class="primary" id="saveClip">Save</button>
+      <span class="saved" id="savedMsg"></span>
+    </div>
+    <div class="publish-cmd" id="publishCmd"></div>
+  </aside>
+
+  <script src="/app.js"></script>
+</body>
+</html>
